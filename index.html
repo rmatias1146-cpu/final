@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torneo Comercial de Bochas</title>
+    <style>
+        :root {
+            --primary: #1b4332;
+            --accent: #2d6a4f;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #212529;
+            --danger: #d90429;
+            --warning: #ffb703;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 15px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .admin-login-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .admin-login-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: #e9ecef;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            margin-bottom: 15px;
+            color: var(--primary);
+            font-size: 1.2rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        form {
+            display: grid;
+            gap: 10px;
+        }
+
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        button.btn-primary {
+            background: var(--accent);
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+
+        .btn-edit { background: var(--warning); color: #000; }
+        .btn-delete { background: var(--danger); color: white; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        th {
+            background-color: #e9ecef;
+            font-size: 0.9rem;
+        }
+
+        /* Ocultar secciones de admin por defecto */
+        .admin-only {
+            display: none !important;
+        }
+
+        /* Mostrar cuando el cuerpo tenga la clase admin-mode */
+        body.admin-mode .admin-only {
+            display: block !important;
+        }
+
+        body.admin-mode .admin-inline {
+            display: inline-block !important;
+        }
+
+        .admin-inline {
+            display: none;
+        }
+
+        /* Modal para ingresar PIN */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 350px;
+            text-align: center;
+        }
+
+        .match-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+    </style>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+</head>
+<body>
+
+    <header>
+        <button id="btnAdminToggle" class="admin-login-btn" onclick="openLoginModal()">Ingresar como Admin</button>
+        <h1>Torneo Comercial de Bochas</h1>
+        <p id="adminStatus" style="font-size: 0.85rem; margin-top: 5px; opacity: 0.9;">Modo Lectura (Jugadores)</p>
+    </header>
+
+    <!-- Modal de Login -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 15px;">Acceso Administrador</h3>
+            <input type="password" id="pinInput" placeholder="Ingrese el PIN" style="width: 100%; margin-bottom: 15px; text-align: center;">
+            <button onclick="loginAdmin()" class="btn-primary" style="width: 100%; margin-bottom: 8px;">Entrar</button>
+            <button onclick="closeLoginModal()" style="width: 100%; background: #ccc; border: none;">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Selector de Zonas -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchZone('Lunes')">Zona Lunes</button>
+        <button class="tab-btn" onclick="switchZone('Miercoles')">Zona Miércoles</button>
+        <button class="tab-btn" onclick="switchZone('Viernes')">Zona Viernes</button>
+    </div>
+
+    <!-- Panel de Administración (Añadir Equipo) -->
+    <div class="card admin-only">
+        <h2>Añadir Equipo (<span class="current-zone-name">Lunes</span>)</h2>
+        <form id="teamForm">
+            <input type="text" id="teamName" placeholder="Nombre del Equipo" required>
+            <input type="text" id="teamMembers" placeholder="Integrantes (ej: Juan, Pedro, Carlos)" required>
+            <button type="submit" class="btn-primary">Guardar Equipo</button>
+        </form>
+    </div>
+
+    <!-- Panel de Administración (Registrar Partido) -->
+    <div class="card admin-only">
+        <h2>Registrar Partido</h2>
+        <form id="matchForm">
+            <label style="font-size: 0.85rem; text-align: left;">Equipo Local:</label>
+            <select id="team1Select" required></select>
+            <input type="number" id="score1" placeholder="Tantos Equipo Local" min="0" required>
+            
+            <label style="font-size: 0.85rem; text-align: left; margin-top: 5px;">Equipo Visitante:</label>
+            <select id="team2Select" required></select>
+            <input type="number" id="score2" placeholder="Tantos Equipo Visitante" min="0" required>
+            
+            <button type="submit" class="btn-primary" style="margin-top: 10px;">Cargar Resultado</button>
+        </form>
+    </div>
+
+    <!-- Tabla de Posiciones -->
+    <div class="card">
+        <h2>Tabla de Posiciones - <span class="current-zone-name">Lunes</span></h2>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pos</th>
+                        <th style="text-align: left;">Equipo</th>
+                        <th>PJ</th>
+                        <th>PG</th>
+                        <th>PP</th>
+                        <th>TF</th>
+                        <th>TC</th>
+                        <th>Diff</th>
+                        <th>Pts</th>
+                    </tr>
+                </thead>
+                <tbody id="standingsTable">
+                    <!-- Cargado dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Historial de Partidos Registrados -->
+    <div class="card">
+        <h2>Partidos Jugados</h2>
+        <div id="matchesList">
+            <!-- Cargado dinámicamente -->
+        </div>
+    </div>
+
+    <!-- Equipos e Integrantes -->
+    <div class="card">
+        <h2>Equipos e Integrantes</h2>
+        <ul id="teamsList" style="list-style: none; padding-left: 0;"></ul>
+    </div>
+
+    <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9CsFY4xKCX3EMsoJf0yTXVbrgSqbL0gs",
+            authDomain: "nuevo-fc992.firebaseapp.com",
+            databaseURL: "https://nuevo-fc992-default-rtdb.firebaseio.com",
+            projectId: "nuevo-fc992",
+            storageBucket: "nuevo-fc992.firebasestorage.app",
+            messagingSenderId: "27573837816",
+            appId: "1:27573837816:web:43ea881c7d75a7f525400d",
+            measurementId: "G-S6S9MD7ZDF"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let currentZone = 'Lunes';
+        let isAdmin = false;
+        const ADMIN_PIN = "1234";
+
+        function openLoginModal() {
+            if (isAdmin) {
+                isAdmin = false;
+                document.body.classList.remove('admin-mode');
+                document.getElementById('adminStatus').innerText = "Modo Lectura (Jugadores)";
+                document.getElementById('btnAdminToggle').innerText = "Ingresar como Admin";
+                alert("Sesión de administrador cerrada.");
+            } else {
+                document.getElementById('loginModal').style.display = 'flex';
+                document.getElementById('pinInput').value = '';
+                document.getElementById('pinInput').focus();
+            }
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+
+        function loginAdmin() {
+            const pin = document.getElementById('pinInput').value;
+            if (pin === ADMIN_PIN) {
+                isAdmin = true;
+                document.body.classList.add('admin-mode');
+                document.getElementById('adminStatus').innerText = "Modo Administrador Activo ⚙️";
+                document.getElementById('btnAdminToggle').innerText = "Cerrar Sesión Admin";
+                closeLoginModal();
+            } else {
+                alert("PIN incorrecto. Intente nuevamente.");
+            }
+        }
+
+        function switchZone(zone) {
+            currentZone = zone;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText.includes(zone));
+            });
+            document.querySelectorAll('.current-zone-name').forEach(el => el.innerText = zone);
+            loadZoneData();
+        }
+
+        function loadZoneData() {
+            db.ref('zones/' + currentZone).on('value', (snapshot) => {
+                const data = snapshot.val() || { teams: {}, matches: {} };
+                const teams = data.teams || {};
+                const matches = data.matches || {};
+
+                renderStandings(teams, matches);
+                renderTeams(teams);
+                renderMatches(matches, teams);
+                populateSelects(teams);
+            });
+        }
+
+        // AGREGAR EQUIPO
+        document.getElementById('teamForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!isAdmin) return;
+            const name = document.getElementById('teamName').value.trim();
+            const members = document.getElementById('teamMembers').value.trim();
+            
+            if (name) {
+                const id = Date.now();
+                db.ref(`zones/${currentZone}/teams/${id}`).set({ name, members });
+                document.getElementById('teamForm').reset();
+            }
+        });
+
+        // EDITAR EQUIPO
+        function editTeam(id, currentName, currentMembers) {
+            if (!isAdmin) return;
+            const newName = prompt("Editar nombre del equipo:", currentName);
+            if (newName === null) return;
+            const newMembers = prompt("Editar integrantes:", currentMembers);
+            if (newMembers === null) return;
+
+            db.ref(`zones/${currentZone}/teams/${id}`).update({
+                name: newName.trim(),
+                members: newMembers.trim()
+            });
+        }
+
+        // ELIMINAR EQUIPO
+        function deleteTeam(id, name) {
+            if (!isAdmin) return;
+            if (confirm(`¿Estás seguro de eliminar el equipo "${name}"? Esto afectará los resultados cargados.`)) {
+                db.ref(`zones/${currentZone}/teams/${id}`).remove();
+            }
+        }
+
+        // REGISTRAR PARTIDO
+        document.getElementById('matchForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!isAdmin) return;
+            const t1 = document.getElementById('team1Select').value;
+            const t2 = document.getElementById('team2Select').value;
+            const s1 = parseInt(document.getElementById('score1').value);
+            const s2 = parseInt(document.getElementById('score2').value);
+
+            if (t1 === t2) {
+                alert("Seleccioná dos equipos distintos.");
+                return;
+            }
+
+            db.ref(`zones/${currentZone}/matches`).push({
+                team1: t1,
+                team2: t2,
+                score1: s1,
+                score2: s2,
+                date: new Date().toISOString()
+            });
+
+            document.getElementById('matchForm').reset();
+        });
+
+        // EDITAR RESULTADO DE PARTIDO
+        function editMatch(matchId, s1, s2) {
+            if (!isAdmin) return;
+            const newScore1 = prompt("Nuevo puntaje Equipo Local:", s1);
+            if (newScore1 === null) return;
+            const newScore2 = prompt("Nuevo puntaje Equipo Visitante:", s2);
+            if (newScore2 === null) return;
+
+            db.ref(`zones/${currentZone}/matches/${matchId}`).update({
+                score1: parseInt(newScore1),
+                score2: parseInt(newScore2)
+            });
+        }
+
+        // ELIMINAR PARTIDO
+        function deleteMatch(matchId) {
+            if (!isAdmin) return;
+            if (confirm("¿Estás seguro de borrar este partido? Se descontarán los puntos automáticamente.")) {
+                db.ref(`zones/${currentZone}/matches/${matchId}`).remove();
+            }
+        }
+
+        // RENDERIZAR TABLA DE POSICIONES
+        function renderStandings(teams = {}, matches = {}) {
+            const stats = {};
+
+            Object.keys(teams).forEach(id => {
+                stats[id] = {
+                    name: teams[id].name,
+                    pj: 0, pg: 0, pp: 0, tf: 0, tc: 0, diff: 0, pts: 0
+                };
+            });
+
+            Object.values(matches).forEach(m => {
+                if (stats[m.team1] && stats[m.team2]) {
+                    stats[m.team1].pj++;
+                    stats[m.team2].pj++;
+                    stats[m.team1].tf += m.score1;
+                    stats[m.team1].tc += m.score2;
+                    stats[m.team2].tf += m.score2;
+                    stats[m.team2].tc += m.score1;
+
+                    if (m.score1 > m.score2) {
+                        stats[m.team1].pg++;
+                        stats[m.team1].pts += 2;
+                        stats[m.team2].pp++;
+                        stats[m.team2].pts += 1;
+                    } else if (m.score2 > m.score1) {
+                        stats[m.team2].pg++;
+                        stats[m.team2].pts += 2;
+                        stats[m.team1].pp++;
+                        stats[m.team1].pts += 1;
+                    }
+                }
+            });
+
+            const sorted = Object.values(stats).map(s => {
+                s.diff = s.tf - s.tc;
+                return s;
+            }).sort((a, b) => b.pts - a.pts || b.diff - a.diff || b.tf - a.tf);
+
+            const tbody = document.getElementById('standingsTable');
+            tbody.innerHTML = sorted.map((s, idx) => `
+                <tr>
+                    <td><b>${idx + 1}</b></td>
+                    <td style="text-align: left;">${s.name}</td>
+                    <td>${s.pj}</td>
+                    <td>${s.pg}</td>
+                    <td>${s.pp}</td>
+                    <td>${s.tf}</td>
+                    <td>${s.tc}</td>
+                    <td>${s.diff > 0 ? '+' + s.diff : s.diff}</td>
+                    <td><b>${s.pts}</b></td>
+                </tr>
+            `).join('');
+        }
+
+        // RENDERIZAR EQUIPOS
+        function renderTeams(teams = {}) {
+            const list = document.getElementById('teamsList');
+            const keys = Object.keys(teams);
+            if (keys.length === 0) {
+                list.innerHTML = '<li style="color: #888;">Aún no hay equipos registrados en esta zona.</li>';
+                return;
+            }
+            list.innerHTML = keys.map(id => {
+                const t = teams[id];
+                return `
+                    <li style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${t.name}</strong>: <span style="color: #666;">${t.members}</span>
+                        </div>
+                        <div class="admin-inline">
+                            <button class="btn-sm btn-edit" onclick="editTeam('${id}', '${t.name}', '${t.members}')">Editar</button>
+                            <button class="btn-sm btn-delete" onclick="deleteTeam('${id}', '${t.name}')">Borrar</button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        // RENDERIZAR HISTORIAL DE PARTIDOS
+        function renderMatches(matches = {}, teams = {}) {
+            const list = document.getElementById('matchesList');
+            const keys = Object.keys(matches);
+
+            if (keys.length === 0) {
+                list.innerHTML = '<p style="color: #888; text-align: center; padding: 10px;">No hay partidos cargados aún.</p>';
+                return;
+            }
+
+            list.innerHTML = keys.map(id => {
+                const m = matches[id];
+                const name1 = teams[m.team1] ? teams[m.team1].name : 'Equipo Eliminado';
+                const name2 = teams[m.team2] ? teams[m.team2].name : 'Equipo Eliminado';
+
+                return `
+                    <div class="match-item">
+                        <div>
+                            <strong>${name1}</strong> (${m.score1}) vs <strong>${name2}</strong> (${m.score2})
+                        </div>
+                        <div class="admin-inline">
+                            <button class="btn-sm btn-edit" onclick="editMatch('${id}', ${m.score1}, ${m.score2})">Modificar</button>
+                            <button class="btn-sm btn-delete" onclick="deleteMatch('${id}')">Borrar</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function populateSelects(teams = {}) {
+            const keys = Object.keys(teams);
+            if (keys.length === 0) {
+                document.getElementById('team1Select').innerHTML = '<option value="">Cargá equipos primero</option>';
+                document.getElementById('team2Select').innerHTML = '<option value="">Cargá equipos primero</option>';
+                return;
+            }
+            const options = keys.map(id => `<option value="${id}">${teams[id].name}</option>`).join('');
+            document.getElementById('team1Select').innerHTML = options;
+            document.getElementById('team2Select').innerHTML = options;
+        }
+
+        // Inicializar
+        loadZoneData();
+    </script>
+</body>
+</html>
